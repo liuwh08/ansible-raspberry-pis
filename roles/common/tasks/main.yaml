@@ -1,0 +1,180 @@
+---
+
+- name: Disable Swap
+  shell: |
+    swapoff -a
+  become: yes
+
+- name: Disble Swapfile
+  systemd:
+    state: stopped
+    name: dphys-swapfile
+  become: yes
+
+- name: Disble Swapfile
+  systemd:
+    enabled: false
+    name: dphys-swapfile
+
+- name: Update all packages
+  apt:
+    update_cache: yes
+    upgrade: dist
+  become: yes
+
+- name: Test for cgroup_enable=memory
+  command: 'grep "cgroup_enable=memory" /boot/cmdline.txt'
+  register: cgroup_group
+  ignore_errors: yes
+  become: yes
+
+- name: Test for module overlay
+  command: 'grep "overlay" /etc/modules'
+  register: overlay_module
+  ignore_errors: yes
+  become: yes
+
+- name: Test for module overlay
+  command: 'grep "br_netfilter" /etc/modules'
+  register: br_netfilter_module
+  ignore_errors: yes
+  become: yes
+
+- name: Add cgroup_enable=memory to cmdline.txt
+  lineinfile:
+    path: /boot/cmdline.txt
+    backrefs: True
+    state: present
+    regexp: '(.*)$'
+    line: '\1 cgroup_enable=memory'
+  when: cgroup_group.rc == 1
+  become: yes
+  notify:
+    - reboot
+
+- name: add overlay to modules to load
+  lineinfile:
+    path: /etc/modules
+    line: overlay
+  become: yes
+  when: overlay_module.rc == 1
+  notify:
+    - reboot
+
+- name: add br_netfilter to modules to load
+  lineinfile:
+    path: /etc/modules
+    line: br_netfilter
+  become: yes
+  when: br_netfilter_module.rc == 1
+  notify:
+    - reboot
+
+#- name: add docker-ce key
+  #apt_key:
+    #url: https://download.docker.com/linux/ubuntu/gpg
+    #state: present
+
+#- name: Add docker-ce repo
+  #apt_repository:
+    #repo: deb https://download.docker.com/linux/ubuntu eoan stable
+    #state: present
+    #filename: kubernetes
+
+- name: Install basic packages
+  apt:
+    pkg:
+      - zsh
+      - vim-nox
+      - git
+      - tree
+      - software-properties-common
+      - arptables
+      - ebtables
+  become: yes
+
+#- name: Install docker
+  #apt:
+    #name: ['containerd.io', 'docker-ce', 'docker-ce-cli']
+    #state: present
+  #become: yes
+  #notify:
+    #- reboot
+
+- name: ensure we're not using nftables (1)
+  shell: |
+    curl -fsSL https://get.docker.com | sh
+  become: yes
+  notify:
+    - reboot
+
+- name: create docker.service.d dir
+  file:
+    path: /etc/systemd/system/docker.service.d
+    state: directory
+
+- name: restart docker
+  service:
+    daemon_reload: yes
+    name: docker
+    enabled: yes
+    state: restarted
+  become: yes
+
+- name: ensure we're not using nftables (1)
+  shell: |
+    update-alternatives --set iptables /usr/sbin/iptables-legacy &&
+    update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy &&
+    update-alternatives --set arptables /usr/sbin/arptables-legacy &&
+    update-alternatives --set ebtables /usr/sbin/ebtables-legacy
+  become: yes
+
+- name: add k8s apt-key
+  apt_key:
+    url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+    state: present
+
+- name: add k8s repo
+  apt_repository:
+    repo: deb https://apt.kubernetes.io/ kubernetes-xenial main
+    state: present
+    filename: kubernetes
+
+- name: update apt cache
+  apt:
+    update_cache: yes
+
+- name: install k8s
+  apt:
+    name: ['kubectl=1.17.4-00', 'kubelet=1.17.4-00', 'kubeadm=1.17.4-00']
+    state: present
+
+- name: Hold kubectl
+  dpkg_selections:
+    name: kubectl
+    selection: hold
+
+- name: Hold kubelet
+  dpkg_selections:
+    name: kubelet
+    selection: hold
+
+- name: Hold kubeadm
+  dpkg_selections:
+    name: kubeadm
+    selection: hold
+
+- name: Hold containerd.io
+  dpkg_selections:
+    name: containerd.io
+    selection: hold
+
+- name: Hold docker-ce
+  dpkg_selections:
+    name: docker-ce
+    selection: hold
+
+- name: Hold docker-ce-cli
+  dpkg_selections:
+    name: docker-ce-cli
+    selection: hold

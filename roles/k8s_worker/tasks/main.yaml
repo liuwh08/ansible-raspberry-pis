@@ -1,0 +1,7 @@
+- name: Reset workers
+  shell: kubeadm reset --force
+  become: true
+
+- name: Join workers to cluster
+  shell: "{{ hostvars[groups['k8s_master'][0]].join_command }} --ignore-preflight-errors=all"
+  become: true

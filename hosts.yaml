@@ -1,0 +1,14 @@
+all:
+  children:
+    k8s_master:
+      hosts:
+        raspberrypi4-0:
+    k8s_worker:
+      hosts:
+        raspberrypi4-1:
+        raspberrypi4-2:
+        raspberrypi3-0:
+  vars:
+    ansible_connection: ssh
+    ansible_user: pi
+    ansible_ssh_pass: raspberry

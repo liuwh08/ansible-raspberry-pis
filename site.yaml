@@ -1,0 +1,20 @@
+---
+- name: apply common changes
+  hosts: all
+  become: yes
+  remote_user: pi
+  roles:
+    - role: common
+
+- name: apply k8s master changes
+  hosts: k8s_master
+  become: yes
+  remote_user: pi
+  roles:
+    - role: k8s_master
+
+- name: apply k8s workder changes
+  hosts: k8s_worker
+  remote_user: pi
+  roles:
+    - role: k8s_worker
